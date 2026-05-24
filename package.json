@@ -1,0 +1,12 @@
+{
+  "name": "world-cup-2026-prediction-pool",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "vercel dev",
+    "deploy": "vercel"
+  },
+  "devDependencies": {
+    "vercel": "^34.0.0"
+  }
+}

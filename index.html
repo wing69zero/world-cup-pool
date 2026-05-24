@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>World Cup 2026 Prediction Pool</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <section class="gate" id="gateView">
+      <form class="gate-card" id="gateForm">
+        <div class="brand gate-brand">
+          <div class="brand-mark">26</div>
+          <div>
+            <h1>World Cup Pool</h1>
+            <p>Private friends pool</p>
+          </div>
+        </div>
+        <div>
+          <p class="eyebrow">Shared online access</p>
+          <h2>Enter pool passcode</h2>
+          <p class="gate-copy">Use the private code your group agreed on to open the shared leaderboard and predictions.</p>
+        </div>
+        <label for="poolPasscode">Passcode</label>
+        <input id="poolPasscode" type="password" autocomplete="current-password" placeholder="Fifa2026" required>
+        <button type="submit">Enter Pool</button>
+        <p class="gate-message" id="gateMessage"></p>
+      </form>
+    </section>
+
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">26</div>
+          <div>
+            <h1>World Cup Pool</h1>
+            <p>Private predictions</p>
+          </div>
+        </div>
+
+        <nav class="nav-tabs" aria-label="App sections">
+          <button class="nav-tab active" data-tab="dashboard" type="button">
+            <span aria-hidden="true">#</span>
+            <span>Dashboard</span>
+          </button>
+          <button class="nav-tab" data-tab="predictions" type="button">
+            <span aria-hidden="true">%</span>
+            <span>Predictions</span>
+          </button>
+          <button class="nav-tab" data-tab="admin" type="button">
+            <span aria-hidden="true">*</span>
+            <span>Setup</span>
+          </button>
+        </nav>
+
+        <section class="pool-card" aria-labelledby="pool-title">
+          <h2 id="pool-title">Pot</h2>
+          <label for="entryAmount">Entry amount</label>
+          <div class="money-row">
+            <span>$</span>
+            <input id="entryAmount" inputmode="decimal" type="number" min="0" step="1">
+          </div>
+          <div class="pot-total-card">
+            <span>Total pot</span>
+            <strong id="totalPot">$0</strong>
+          </div>
+          <p id="potSummary"></p>
+        </section>
+      </aside>
+
+      <main>
+        <section class="topbar">
+          <div>
+            <p class="eyebrow">Friends-only scoreline game</p>
+            <h2 id="pageTitle">Dashboard</h2>
+            <p class="source-note">
+              Group Stage fixtures preloaded from the
+              <a href="https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums" target="_blank" rel="noreferrer">FIFA World Cup 2026 schedule</a>.
+            </p>
+          </div>
+          <div class="topbar-actions">
+            <span class="sync-status" id="syncStatus">Connecting</span>
+            <button class="secondary-button" id="refreshData" type="button">Refresh</button>
+            <button class="secondary-button" id="leavePool" type="button">Leave</button>
+          </div>
+        </section>
+
+        <section class="view active" id="dashboardView">
+          <div class="stats-grid">
+            <article class="stat">
+              <span>Players</span>
+              <strong id="playerCount">0</strong>
+            </article>
+            <article class="stat">
+              <span>Matches</span>
+              <strong id="matchCount">0</strong>
+            </article>
+            <article class="stat">
+              <span>Predictions</span>
+              <strong id="predictionCount">0</strong>
+            </article>
+            <article class="stat">
+              <span>Locked</span>
+              <strong id="lockedCount">0</strong>
+            </article>
+          </div>
+
+          <div class="content-grid">
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Leaderboard</h3>
+                <span class="muted">Exact score = 1 point</span>
+              </div>
+              <div class="leaderboard" id="leaderboard"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Upcoming Locks</h3>
+                <span class="muted">Predictions close at kickoff</span>
+              </div>
+              <div class="match-list compact" id="upcomingMatches"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="predictionsView">
+          <section class="panel">
+            <div class="panel-heading wrap">
+              <div>
+                <h3>Submit Predictions</h3>
+                <span class="muted">Pick a player, then enter exact scorelines.</span>
+              </div>
+              <label class="select-label">
+                Player
+                <select id="playerSelect"></select>
+              </label>
+            </div>
+            <div class="prediction-board" id="predictionBoard"></div>
+          </section>
+        </section>
+
+        <section class="view" id="adminView">
+          <div class="content-grid admin-grid">
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Players</h3>
+                <span class="muted">Add everyone in the pool.</span>
+              </div>
+              <form class="inline-form" id="playerForm">
+                <input id="playerName" placeholder="Friend name" required>
+                <button type="submit">Add</button>
+              </form>
+              <div class="pill-list" id="playerList"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Matches</h3>
+                <span class="muted">Group Stage fixtures are preloaded. Add extra matches here later.</span>
+              </div>
+              <form class="match-form" id="matchForm">
+                <input id="homeTeam" placeholder="Home team" required>
+                <input id="awayTeam" placeholder="Away team" required>
+                <input id="kickoff" type="datetime-local" required>
+                <button type="submit">Add Match</button>
+              </form>
+              <div class="match-list" id="adminMatches"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <template id="emptyStateTemplate">
+      <div class="empty-state">
+        <strong>Nothing here yet</strong>
+        <p>Add players and matches in Setup to get the pool moving.</p>
+      </div>
+    </template>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
