@@ -125,6 +125,41 @@ button {
   font-weight: 800;
 }
 
+.football-icon {
+  position: relative;
+  display: block;
+  width: 30px;
+  height: 30px;
+  border: 3px solid #17221d;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, #17221d 0 4px, transparent 5px),
+    linear-gradient(36deg, transparent 43%, #17221d 44% 48%, transparent 49%),
+    linear-gradient(144deg, transparent 43%, #17221d 44% 48%, transparent 49%),
+    linear-gradient(72deg, transparent 43%, #17221d 44% 48%, transparent 49%),
+    #fff8e8;
+}
+
+.football-icon::before,
+.football-icon::after {
+  position: absolute;
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #17221d;
+}
+
+.football-icon::before {
+  top: 5px;
+  left: 6px;
+}
+
+.football-icon::after {
+  right: 6px;
+  bottom: 5px;
+}
+
 .brand h1,
 .brand p,
 .pool-card h2,
