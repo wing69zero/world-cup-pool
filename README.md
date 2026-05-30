@@ -23,6 +23,18 @@ The pool passcode created by the SQL script is:
 Fifa2026
 ```
 
+## Optional Test Pool
+
+To create a separate staging/test pool in the same Supabase project, run `add-test-pool.sql` in the Supabase SQL Editor.
+
+That creates this passcode:
+
+```text
+Test2026
+```
+
+Use `Test2026` for fake players, test matches, and lock-timing tests. Use `Fifa2026` for the real friends pool.
+
 ## Vercel Deployment
 
 Add these environment variables in Vercel:

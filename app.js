@@ -203,7 +203,7 @@ async function ensureGroupStageMatches() {
   throwIfSupabaseError(error);
   if (count && count >= 72) return;
 
-  const seedRows = createGroupStageMatches().map(toMatchRow);
+  const seedRows = createGroupStageMatches().map((match) => toMatchRow(match, { scopeSeedId: true }));
   const { error: upsertError } = await db
     .from("matches")
     .upsert(seedRows, { onConflict: "id" });
@@ -447,9 +447,9 @@ function setStatus(text) {
   elements.syncStatus.textContent = text;
 }
 
-function toMatchRow(match) {
+function toMatchRow(match, options = {}) {
   return {
-    id: match.id,
+    id: options.scopeSeedId ? poolScopedMatchId(match.matchNo) : match.id,
     pool_id: currentPool.id,
     match_no: match.matchNo,
     group_name: match.groupName,
@@ -461,6 +461,11 @@ function toMatchRow(match) {
     home_score: match.homeScore,
     away_score: match.awayScore
   };
+}
+
+function poolScopedMatchId(matchNo) {
+  const code = currentPool?.code || DEFAULT_POOL_CODE;
+  return `${code.toLowerCase()}-wc26-${matchNo}`;
 }
 
 function fromMatchRow(row) {
@@ -555,7 +560,7 @@ function createGroupStageMatches() {
   ];
 
   return rows.map(([matchNo, groupName, homeTeam, awayTeam, kickoff, venue]) => ({
-    id: `wc26-${matchNo}`,
+    id: poolScopedMatchId(matchNo),
     matchNo,
     groupName,
     homeTeam,
