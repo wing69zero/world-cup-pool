@@ -138,7 +138,13 @@ async function enterPool(passcode, options = {}) {
   currentPool = data;
   localStorage.setItem(POOL_CODE_KEY, code);
   showApp();
-  await ensureGroupStageMatches();
+
+  try {
+    await ensureGroupStageMatches();
+  } catch (error) {
+    console.warn("Fixture seed check skipped:", error);
+  }
+
   await loadPoolData();
   startAutoRefresh();
 }
@@ -582,11 +588,28 @@ elements.gateForm.addEventListener("submit", async (event) => {
   try {
     await enterPool(elements.poolPasscode.value);
   } catch (error) {
-    showGate("Could not connect to the pool. Check Supabase setup and try again.");
+    showGate(`Could not connect to the pool. ${friendlyErrorMessage(error)}`);
     setStatus("Error");
     console.error(error);
   }
 });
+
+function friendlyErrorMessage(error) {
+  if (!navigator.onLine) {
+    return "Your device appears to be offline.";
+  }
+
+  const message = String(error?.message || "");
+  if (message.includes("Failed to fetch") || message.includes("fetch")) {
+    return "Please check your internet connection and try again.";
+  }
+
+  if (error?.code) {
+    return `Supabase returned ${error.code}. Please try again shortly.`;
+  }
+
+  return "Please try again shortly.";
+}
 
 elements.entryAmount.addEventListener("change", async (event) => {
   if (!currentPool) return;
