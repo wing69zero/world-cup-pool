@@ -36,7 +36,6 @@ const elements = {
 
 let db;
 let currentPool = null;
-let refreshTimer = null;
 
 let state = {
   entryAmount: 0,
@@ -158,17 +157,6 @@ async function enterPool(passcode, options = {}) {
   }
 
   await loadPoolData();
-  startAutoRefresh();
-}
-
-function startAutoRefresh() {
-  clearInterval(refreshTimer);
-  refreshTimer = setInterval(() => {
-    loadPoolData({ quiet: true }).catch((error) => {
-      setStatus("Refresh failed");
-      console.error(error);
-    });
-  }, 30000);
 }
 
 async function loadPoolData(options = {}) {
@@ -205,7 +193,7 @@ async function loadPoolData(options = {}) {
   };
 
   render();
-  setStatus("Synced");
+  setStatus("Synced - refresh manually");
 }
 
 function throwIfSupabaseError(error) {
@@ -659,7 +647,6 @@ elements.refreshData.addEventListener("click", () => {
 });
 
 elements.leavePool.addEventListener("click", () => {
-  clearInterval(refreshTimer);
   currentPool = null;
   localStorage.removeItem(POOL_CODE_KEY);
   showGate("You have left the pool on this device.");
