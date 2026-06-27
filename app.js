@@ -55,16 +55,28 @@ async function bootstrap() {
     if (!config.supabaseUrl || !config.supabaseAnonKey) {
       throw new Error("Supabase URL or anon key is missing.");
     }
+
+    if (!window.supabase?.createClient) {
+      throw new Error("Supabase browser client could not load.");
+    }
+
     db = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
 
     const savedCode = localStorage.getItem(POOL_CODE_KEY);
     if (savedCode) {
-      await enterPool(savedCode, { silent: true });
+      try {
+        await enterPool(savedCode, { silent: true });
+      } catch (error) {
+        localStorage.removeItem(POOL_CODE_KEY);
+        showGate(`Could not reconnect to the pool. ${friendlyErrorMessage(error)}`);
+        setStatus("Error");
+        console.error(error);
+      }
     } else {
       showGate("Enter your group passcode to begin.");
     }
   } catch (error) {
-    showGate("Supabase is not configured yet. Add Vercel env vars or a local config file.");
+    showGate(`App setup issue. ${friendlySetupMessage(error)}`);
     setStatus("Setup needed");
     console.error(error);
   }
@@ -609,6 +621,20 @@ function friendlyErrorMessage(error) {
   }
 
   return "Please try again shortly.";
+}
+
+function friendlySetupMessage(error) {
+  const message = String(error?.message || "");
+
+  if (message.includes("URL") || message.includes("anon key")) {
+    return "Supabase settings are missing in Vercel.";
+  }
+
+  if (message.includes("browser client")) {
+    return "The Supabase browser library did not load. Please refresh, or try another browser/network.";
+  }
+
+  return friendlyErrorMessage(error);
 }
 
 elements.entryAmount.addEventListener("change", async (event) => {
