@@ -298,30 +298,30 @@ async function ensureKnockoutSetup() {
 
 function createKnockoutMatches() {
   const rows = [
-    [1, "R16", "Round of 16 - Match 1", "R16 Team A1", "R16 Team B1"],
-    [2, "R16", "Round of 16 - Match 2", "R16 Team A2", "R16 Team B2"],
-    [3, "R16", "Round of 16 - Match 3", "R16 Team A3", "R16 Team B3"],
-    [4, "R16", "Round of 16 - Match 4", "R16 Team A4", "R16 Team B4"],
-    [5, "R16", "Round of 16 - Match 5", "R16 Team A5", "R16 Team B5"],
-    [6, "R16", "Round of 16 - Match 6", "R16 Team A6", "R16 Team B6"],
-    [7, "R16", "Round of 16 - Match 7", "R16 Team A7", "R16 Team B7"],
-    [8, "R16", "Round of 16 - Match 8", "R16 Team A8", "R16 Team B8"],
-    [9, "QF", "Quarter-final 1", "QF Team A1", "QF Team B1"],
-    [10, "QF", "Quarter-final 2", "QF Team A2", "QF Team B2"],
-    [11, "QF", "Quarter-final 3", "QF Team A3", "QF Team B3"],
-    [12, "QF", "Quarter-final 4", "QF Team A4", "QF Team B4"],
-    [13, "SF", "Semi-final 1", "SF Team A1", "SF Team B1"],
-    [14, "SF", "Semi-final 2", "SF Team A2", "SF Team B2"],
-    [15, "3P", "Third-place match", "Third-place Team A", "Third-place Team B"],
-    [16, "Final", "Final", "Finalist A", "Finalist B"]
+    [1, "R16", "M89: Round of 16 - PAR vs FRA", "2026-07-04T21:00:00Z", "PAR", "FRA"],
+    [2, "R16", "M90: Round of 16 - CAN vs MAR", "2026-07-04T17:00:00Z", "CAN", "MAR"],
+    [3, "R16", "M91: Round of 16 - BRA vs NOR", "2026-07-05T20:00:00Z", "BRA", "NOR"],
+    [4, "R16", "M92: Round of 16 - MEX vs W80", "2026-07-06T00:00:00Z", "MEX", "W80"],
+    [5, "R16", "M93: Round of 16 - W83 vs W84", "2026-07-06T19:00:00Z", "W83", "W84"],
+    [6, "R16", "M94: Round of 16 - W81 vs W82", "2026-07-07T00:00:00Z", "W81", "W82"],
+    [7, "R16", "M95: Round of 16 - W86 vs W88", "2026-07-07T16:00:00Z", "W86", "W88"],
+    [8, "R16", "M96: Round of 16 - W85 vs W87", "2026-07-07T20:00:00Z", "W85", "W87"],
+    [9, "QF", "M97: Quarter-final - W89 vs W90", "2026-07-09T20:00:00Z", "W89", "W90"],
+    [10, "QF", "M98: Quarter-final - W93 vs W94", "2026-07-10T19:00:00Z", "W93", "W94"],
+    [11, "QF", "M99: Quarter-final - W91 vs W92", "2026-07-11T21:00:00Z", "W91", "W92"],
+    [12, "QF", "M100: Quarter-final - W95 vs W96", "2026-07-12T01:00:00Z", "W95", "W96"],
+    [13, "SF", "M101: Semi-final - W97 vs W98", "2026-07-14T19:00:00Z", "W97", "W98"],
+    [14, "SF", "M102: Semi-final - W99 vs W100", "2026-07-15T19:00:00Z", "W99", "W100"],
+    [15, "3P", "M103: Third-place match - RU101 vs RU102", "2026-07-18T21:00:00Z", "RU101", "RU102"],
+    [16, "Final", "M104: Final - W101 vs W102", "2026-07-19T19:00:00Z", "W101", "W102"]
   ];
 
-  return rows.map(([slotNo, stage, label, teamA, teamB]) => ({
+  return rows.map(([slotNo, stage, label, kickoff, teamA, teamB]) => ({
     id: `${currentPool.code.toLowerCase()}-ko-${slotNo}`,
     slotNo,
     stage,
     label,
-    kickoff: new Date(Date.UTC(2026, 6, 4, (slotNo - 1) * 4)).toISOString(),
+    kickoff,
     teamA,
     teamB,
     actualTotalGoals: null,

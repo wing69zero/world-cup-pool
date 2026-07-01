@@ -55,6 +55,8 @@ The knockout mode contains two sub-pools:
 
 All knockout predictions lock at the global lock time configured in Setup.
 
+If the knockout tables already exist, run `update-knockout-schedule.sql` to refresh the KO2026 and KOTEST2026 match labels, known teams, kickoff times, pots, and global lock time.
+
 Bracket winner dropdowns expand by stage:
 
 - R16: choose from 2 teams.
