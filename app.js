@@ -1146,7 +1146,14 @@ elements.matchForm.addEventListener("submit", async (event) => {
   await loadPoolData();
 });
 
-elements.playerSelect.addEventListener("change", renderPredictions);
+elements.playerSelect.addEventListener("change", () => {
+  if (isKnockoutPool()) {
+    renderKnockoutPredictions();
+    return;
+  }
+
+  renderPredictions();
+});
 
 document.addEventListener("click", async (event) => {
   const playerId = event.target.dataset.removePlayer;
