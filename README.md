@@ -35,6 +35,26 @@ Test2026
 
 Use `Test2026` for fake players, test matches, and lock-timing tests. Use `Fifa2026` for the real friends pool.
 
+## Knockout Pools
+
+Run `knockout-schema.sql` in the Supabase SQL Editor to add the knockout-stage game.
+
+Passcodes:
+
+```text
+KO2026
+KOTEST2026
+```
+
+`KO2026` is for the real knockout pool. `KOTEST2026` is for testing.
+
+The knockout mode contains two sub-pools:
+
+- Goals Pool: predict total goals for each knockout match. Exact = 3 points, off by 1 = 1 point.
+- Bracket Pool: predict each match winner. R16 = 2 points, QF = 3, SF = 5, third-place = 3, final = 8.
+
+All knockout predictions lock at the global lock time configured in Setup.
+
 ## Vercel Deployment
 
 Add these environment variables in Vercel:

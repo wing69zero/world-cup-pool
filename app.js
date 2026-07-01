@@ -1,5 +1,6 @@
 const DEFAULT_POOL_CODE = "Fifa2026";
 const POOL_CODE_KEY = "worldCup2026PoolCode";
+const KNOCKOUT_CODES = new Set(["KO2026", "KOTEST2026"]);
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -41,7 +42,10 @@ let state = {
   entryAmount: 0,
   players: [],
   matches: [],
-  predictions: []
+  predictions: [],
+  knockoutSettings: null,
+  knockoutMatches: [],
+  knockoutPredictions: []
 };
 
 bootstrap();
@@ -150,10 +154,18 @@ async function enterPool(passcode, options = {}) {
   localStorage.setItem(POOL_CODE_KEY, code);
   showApp();
 
-  try {
-    await ensureGroupStageMatches();
-  } catch (error) {
-    console.warn("Fixture seed check skipped:", error);
+  if (isKnockoutPool()) {
+    try {
+      await ensureKnockoutSetup();
+    } catch (error) {
+      console.warn("Knockout setup check skipped:", error);
+    }
+  } else {
+    try {
+      await ensureGroupStageMatches();
+    } catch (error) {
+      console.warn("Fixture seed check skipped:", error);
+    }
   }
 
   await loadPoolData();
@@ -162,6 +174,11 @@ async function enterPool(passcode, options = {}) {
 async function loadPoolData(options = {}) {
   if (!currentPool) return;
   if (!options.quiet) setStatus("Syncing");
+
+  if (isKnockoutPool()) {
+    await loadKnockoutPoolData();
+    return;
+  }
 
   const [poolResult, playersResult, matchesResult, predictionsResult] = await Promise.all([
     db.from("pools").select("id, name, code, entry_amount").eq("id", currentPool.id).single(),
@@ -196,6 +213,39 @@ async function loadPoolData(options = {}) {
   setStatus("Synced - refresh manually");
 }
 
+async function loadKnockoutPoolData() {
+  const [poolResult, playersResult, settingsResult, matchesResult, predictionsResult] = await Promise.all([
+    db.from("pools").select("id, name, code, entry_amount").eq("id", currentPool.id).single(),
+    db.from("players").select("id, name").eq("pool_id", currentPool.id).order("name"),
+    db.from("knockout_settings").select("*").eq("pool_id", currentPool.id).maybeSingle(),
+    db.from("knockout_matches").select("*").eq("pool_id", currentPool.id).order("slot_no"),
+    db.from("knockout_predictions").select("*").eq("pool_id", currentPool.id)
+  ]);
+
+  throwIfSupabaseError(poolResult.error);
+  throwIfSupabaseError(playersResult.error);
+  throwIfSupabaseError(settingsResult.error);
+  throwIfSupabaseError(matchesResult.error);
+  throwIfSupabaseError(predictionsResult.error);
+
+  currentPool = poolResult.data;
+  state = {
+    entryAmount: Number(currentPool.entry_amount || 0),
+    players: playersResult.data.map((player) => ({
+      id: player.id,
+      name: player.name
+    })),
+    matches: [],
+    predictions: [],
+    knockoutSettings: fromKnockoutSettingsRow(settingsResult.data),
+    knockoutMatches: matchesResult.data.map(fromKnockoutMatchRow),
+    knockoutPredictions: predictionsResult.data.map(fromKnockoutPredictionRow)
+  };
+
+  render();
+  setStatus("Synced - refresh manually");
+}
+
 function throwIfSupabaseError(error) {
   if (error) throw error;
 }
@@ -217,7 +267,75 @@ async function ensureGroupStageMatches() {
   throwIfSupabaseError(upsertError);
 }
 
+async function ensureKnockoutSetup() {
+  const defaultSettings = {
+    pool_id: currentPool.id,
+    lock_at: "2026-07-04T00:00:00Z",
+    goals_pot: 125,
+    bracket_pot: 125
+  };
+
+  const { error: settingsError } = await db
+    .from("knockout_settings")
+    .upsert(defaultSettings, { onConflict: "pool_id", ignoreDuplicates: true });
+
+  throwIfSupabaseError(settingsError);
+
+  const { count, error } = await db
+    .from("knockout_matches")
+    .select("id", { count: "exact", head: true })
+    .eq("pool_id", currentPool.id);
+
+  throwIfSupabaseError(error);
+  if (count && count >= 16) return;
+
+  const { error: matchError } = await db
+    .from("knockout_matches")
+    .upsert(createKnockoutMatches().map(toKnockoutMatchRow), { onConflict: "id" });
+
+  throwIfSupabaseError(matchError);
+}
+
+function createKnockoutMatches() {
+  const rows = [
+    [1, "R16", "Round of 16 - Match 1", "R16 Team A1", "R16 Team B1"],
+    [2, "R16", "Round of 16 - Match 2", "R16 Team A2", "R16 Team B2"],
+    [3, "R16", "Round of 16 - Match 3", "R16 Team A3", "R16 Team B3"],
+    [4, "R16", "Round of 16 - Match 4", "R16 Team A4", "R16 Team B4"],
+    [5, "R16", "Round of 16 - Match 5", "R16 Team A5", "R16 Team B5"],
+    [6, "R16", "Round of 16 - Match 6", "R16 Team A6", "R16 Team B6"],
+    [7, "R16", "Round of 16 - Match 7", "R16 Team A7", "R16 Team B7"],
+    [8, "R16", "Round of 16 - Match 8", "R16 Team A8", "R16 Team B8"],
+    [9, "QF", "Quarter-final 1", "QF Team A1", "QF Team B1"],
+    [10, "QF", "Quarter-final 2", "QF Team A2", "QF Team B2"],
+    [11, "QF", "Quarter-final 3", "QF Team A3", "QF Team B3"],
+    [12, "QF", "Quarter-final 4", "QF Team A4", "QF Team B4"],
+    [13, "SF", "Semi-final 1", "SF Team A1", "SF Team B1"],
+    [14, "SF", "Semi-final 2", "SF Team A2", "SF Team B2"],
+    [15, "3P", "Third-place match", "Third-place Team A", "Third-place Team B"],
+    [16, "Final", "Final", "Finalist A", "Finalist B"]
+  ];
+
+  return rows.map(([slotNo, stage, label, teamA, teamB]) => ({
+    id: `${currentPool.code.toLowerCase()}-ko-${slotNo}`,
+    slotNo,
+    stage,
+    label,
+    kickoff: new Date(Date.UTC(2026, 6, 4, (slotNo - 1) * 4)).toISOString(),
+    teamA,
+    teamB,
+    actualTotalGoals: null,
+    winner: null
+  }));
+}
+
 function render() {
+  if (isKnockoutPool()) {
+    renderKnockout();
+    return;
+  }
+
+  elements.matchForm.style.display = "";
   state.matches.sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
   elements.entryAmount.value = state.entryAmount ?? 0;
   renderStats();
@@ -228,6 +346,94 @@ function render() {
   renderPlayerList();
   renderAdminMatches();
   renderPredictions();
+}
+
+function renderKnockout() {
+  elements.matchForm.style.display = "none";
+  elements.entryAmount.value = state.entryAmount ?? 25;
+  elements.pageTitle.textContent = "Knockout Pools";
+  renderKnockoutStats();
+  renderKnockoutPot();
+  renderKnockoutDashboard();
+  renderPlayerSelect();
+  renderPlayerList();
+  renderKnockoutAdmin();
+  renderKnockoutPredictions();
+}
+
+function renderKnockoutStats() {
+  const filledGoals = state.knockoutPredictions.filter((prediction) => prediction.goalsPrediction !== null).length;
+  const filledWinners = state.knockoutPredictions.filter((prediction) => prediction.winnerPrediction).length;
+  elements.playerCount.textContent = state.players.length;
+  elements.matchCount.textContent = state.knockoutMatches.length;
+  elements.predictionCount.textContent = filledGoals + filledWinners;
+  elements.lockedCount.textContent = isKnockoutLocked() ? state.knockoutMatches.length : 0;
+}
+
+function renderKnockoutPot() {
+  const total = Number(state.knockoutSettings?.goalsPot || 0) + Number(state.knockoutSettings?.bracketPot || 0);
+  elements.totalPot.textContent = `$${total.toLocaleString()}`;
+  elements.potSummary.textContent = `Goals $${Number(state.knockoutSettings?.goalsPot || 0).toLocaleString()} + Bracket $${Number(state.knockoutSettings?.bracketPot || 0).toLocaleString()}`;
+}
+
+function renderKnockoutDashboard() {
+  const goalsRows = getKnockoutLeaderboard("goals");
+  const bracketRows = getKnockoutLeaderboard("bracket");
+  const lockText = state.knockoutSettings?.lockAt ? formatDate(state.knockoutSettings.lockAt) : "Not set";
+
+  elements.leaderboard.innerHTML = `
+    <div class="leaderboard-section">
+      <h4>Goals Pool</h4>
+      ${leaderboardRowsMarkup(goalsRows)}
+    </div>
+    <div class="leaderboard-section">
+      <h4>Bracket Pool</h4>
+      ${leaderboardRowsMarkup(bracketRows)}
+    </div>
+  `;
+
+  elements.upcomingMatches.innerHTML = `
+    <article class="match-row">
+      <div class="match-meta">
+        <div>
+          <div class="teams">Global prediction lock</div>
+          <div class="time">${escapeHtml(lockText)}</div>
+        </div>
+        <span class="lock ${isKnockoutLocked() ? "closed" : ""}">${isKnockoutLocked() ? "Locked" : "Open"}</span>
+      </div>
+    </article>
+    <article class="match-row">
+      <div class="time">Goals Pool: exact total goals = 3 pts, off by 1 = 1 pt. Penalty shootout goals do not count.</div>
+      <div class="time">Bracket Pool: R16 2 pts, QF 3 pts, SF 5 pts, third-place 3 pts, final 8 pts. Penalty winners count.</div>
+    </article>
+  `;
+}
+
+function leaderboardRowsMarkup(rows) {
+  if (!rows.length) {
+    return `<div class="empty-state"><strong>No players yet</strong><p>Add players in Setup.</p></div>`;
+  }
+
+  return rows
+    .map((player, index) => `
+      <div class="leader-row">
+        <span class="rank">${index + 1}</span>
+        <strong>${escapeHtml(player.name)}</strong>
+        <span class="score">${player.points} pt${player.points === 1 ? "" : "s"}</span>
+      </div>
+    `)
+    .join("");
+}
+
+function getKnockoutLeaderboard(type) {
+  return state.players
+    .map((player) => ({
+      ...player,
+      points: state.knockoutPredictions
+        .filter((prediction) => prediction.playerId === player.id)
+        .reduce((sum, prediction) => sum + knockoutPointsForPrediction(prediction, type), 0)
+    }))
+    .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
 }
 
 function renderStats() {
@@ -335,6 +541,106 @@ function renderAdminMatches() {
     .join("");
 }
 
+function renderKnockoutPredictions() {
+  const selectedPlayerId = elements.playerSelect.value || state.players[0]?.id;
+
+  if (!state.players.length || !state.knockoutMatches.length) {
+    renderEmpty(elements.predictionBoard, "Knockout predictions need players and matches", "Add players in Setup first.");
+    return;
+  }
+
+  const locked = isKnockoutLocked();
+  elements.predictionBoard.innerHTML = state.knockoutMatches
+    .map((match) => {
+      const prediction = getKnockoutPrediction(selectedPlayerId, match.id);
+      const winnerOptions = [match.teamA, match.teamB]
+        .filter(Boolean)
+        .map((team) => `<option value="${escapeHtml(team)}" ${prediction?.winnerPrediction === team ? "selected" : ""}>${escapeHtml(team)}</option>`)
+        .join("");
+
+      return `
+        <article class="prediction-row">
+          <div class="prediction-meta">
+            <div>
+              <div class="teams">${escapeHtml(match.label)}: ${escapeHtml(match.teamA)} vs ${escapeHtml(match.teamB)}</div>
+              <div class="time">${escapeHtml(match.stage)} - ${formatDate(match.kickoff)}</div>
+            </div>
+            <div>
+              <span class="lock ${locked ? "closed" : ""}">${locked ? "Locked" : "Open"}</span>
+              <span class="points"> - Goals ${knockoutPointsForPrediction(prediction, "goals")} pts / Bracket ${knockoutPointsForPrediction(prediction, "bracket")} pts</span>
+            </div>
+          </div>
+          <form class="knockout-prediction-form" data-ko-prediction-match="${match.id}">
+            <label>
+              Total goals
+              <input min="0" type="number" value="${prediction?.goalsPrediction ?? ""}" placeholder="0" ${locked ? "disabled" : ""}>
+            </label>
+            <label>
+              Winner
+              <select ${locked ? "disabled" : ""}>
+                <option value="">Pick winner</option>
+                ${winnerOptions}
+              </select>
+            </label>
+            <button type="submit" ${locked ? "disabled" : ""}>Save Picks</button>
+          </form>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderKnockoutAdmin() {
+  const lockLocal = state.knockoutSettings?.lockAt ? toDateTimeLocal(state.knockoutSettings.lockAt) : "";
+
+  elements.adminMatches.innerHTML = `
+    <article class="match-row">
+      <form class="knockout-settings-form" data-ko-settings>
+        <label>
+          Global lock time
+          <input type="datetime-local" value="${lockLocal}" required>
+        </label>
+        <label>
+          Goals pot
+          <input min="0" type="number" value="${state.knockoutSettings?.goalsPot ?? 125}" required>
+        </label>
+        <label>
+          Bracket pot
+          <input min="0" type="number" value="${state.knockoutSettings?.bracketPot ?? 125}" required>
+        </label>
+        <button type="submit">Save Knockout Settings</button>
+      </form>
+    </article>
+    ${state.knockoutMatches.map(knockoutAdminMatchMarkup).join("")}
+  `;
+}
+
+function knockoutAdminMatchMarkup(match) {
+  return `
+    <article class="match-row">
+      <form class="knockout-match-form" data-ko-match="${match.id}">
+        <div class="prediction-meta">
+          <div>
+            <div class="teams">${escapeHtml(match.label)}</div>
+            <div class="time">${escapeHtml(match.stage)} - slot ${match.slotNo}</div>
+          </div>
+        </div>
+        <input aria-label="Match label" value="${escapeHtml(match.label)}" required>
+        <input aria-label="Team A" value="${escapeHtml(match.teamA)}" required>
+        <input aria-label="Team B" value="${escapeHtml(match.teamB)}" required>
+        <input aria-label="Kickoff" type="datetime-local" value="${toDateTimeLocal(match.kickoff)}" required>
+        <input aria-label="Actual total goals" min="0" type="number" value="${match.actualTotalGoals ?? ""}" placeholder="Actual total goals">
+        <select aria-label="Actual winner">
+          <option value="">Winner not set</option>
+          <option value="${escapeHtml(match.teamA)}" ${match.winner === match.teamA ? "selected" : ""}>${escapeHtml(match.teamA)}</option>
+          <option value="${escapeHtml(match.teamB)}" ${match.winner === match.teamB ? "selected" : ""}>${escapeHtml(match.teamB)}</option>
+        </select>
+        <button type="submit">Save Match</button>
+      </form>
+    </article>
+  `;
+}
+
 function renderPredictions() {
   const selectedPlayerId = elements.playerSelect.value || state.players[0]?.id;
 
@@ -404,12 +710,51 @@ function getPrediction(playerId, matchId) {
   return state.predictions.find((prediction) => prediction.playerId === playerId && prediction.matchId === matchId);
 }
 
+function getKnockoutPrediction(playerId, matchId) {
+  return state.knockoutPredictions.find((prediction) => prediction.playerId === playerId && prediction.matchId === matchId);
+}
+
 function isLocked(match) {
   return new Date(match.kickoff) <= new Date();
 }
 
 function hasResult(match) {
   return match.homeScore !== null && match.awayScore !== null && match.homeScore !== "" && match.awayScore !== "";
+}
+
+function isKnockoutPool() {
+  return KNOCKOUT_CODES.has(currentPool?.code);
+}
+
+function isKnockoutLocked() {
+  return Boolean(state.knockoutSettings?.lockAt) && new Date(state.knockoutSettings.lockAt) <= new Date();
+}
+
+function knockoutPointsForPrediction(prediction, type) {
+  if (!prediction) return 0;
+  const match = state.knockoutMatches.find((item) => item.id === prediction.matchId);
+  if (!match) return 0;
+
+  if (type === "goals") {
+    if (prediction.goalsPrediction === null || match.actualTotalGoals === null) return 0;
+    const gap = Math.abs(Number(prediction.goalsPrediction) - Number(match.actualTotalGoals));
+    if (gap === 0) return 3;
+    if (gap === 1) return 1;
+    return 0;
+  }
+
+  if (!prediction.winnerPrediction || !match.winner) return 0;
+  return prediction.winnerPrediction === match.winner ? knockoutStagePoints(match.stage) : 0;
+}
+
+function knockoutStagePoints(stage) {
+  return {
+    R16: 2,
+    QF: 3,
+    SF: 5,
+    "3P": 3,
+    Final: 8
+  }[stage] || 0;
 }
 
 function formatDate(value) {
@@ -487,6 +832,61 @@ function fromMatchRow(row) {
     homeScore: row.home_score,
     awayScore: row.away_score
   };
+}
+
+function fromKnockoutSettingsRow(row) {
+  if (!row) return null;
+  return {
+    lockAt: row.lock_at,
+    goalsPot: Number(row.goals_pot || 0),
+    bracketPot: Number(row.bracket_pot || 0)
+  };
+}
+
+function toKnockoutMatchRow(match) {
+  return {
+    id: match.id,
+    pool_id: currentPool.id,
+    slot_no: match.slotNo,
+    stage: match.stage,
+    label: match.label,
+    kickoff: match.kickoff,
+    team_a: match.teamA,
+    team_b: match.teamB,
+    actual_total_goals: match.actualTotalGoals,
+    winner: match.winner
+  };
+}
+
+function fromKnockoutMatchRow(row) {
+  return {
+    id: row.id,
+    slotNo: row.slot_no,
+    stage: row.stage,
+    label: row.label,
+    kickoff: row.kickoff,
+    teamA: row.team_a,
+    teamB: row.team_b,
+    actualTotalGoals: row.actual_total_goals,
+    winner: row.winner
+  };
+}
+
+function fromKnockoutPredictionRow(row) {
+  return {
+    id: row.id,
+    playerId: row.player_id,
+    matchId: row.match_id,
+    goalsPrediction: row.goals_prediction,
+    winnerPrediction: row.winner_prediction
+  };
+}
+
+function toDateTimeLocal(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  const pad = (number) => String(number).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function createGroupStageMatches() {
@@ -720,10 +1120,81 @@ document.addEventListener("click", async (event) => {
 });
 
 document.addEventListener("submit", async (event) => {
+  const knockoutSettings = event.target.dataset.koSettings !== undefined;
+  const knockoutMatchId = event.target.dataset.koMatch;
+  const knockoutPredictionMatchId = event.target.dataset.koPredictionMatch;
   const scoreMatchId = event.target.dataset.scoreMatch;
   const predictionMatchId = event.target.dataset.predictionMatch;
 
   try {
+    if (knockoutSettings) {
+      event.preventDefault();
+      const [lockInput, goalsPotInput, bracketPotInput] = event.target.querySelectorAll("input");
+      setStatus("Saving");
+
+      const { error } = await db
+        .from("knockout_settings")
+        .upsert({
+          pool_id: currentPool.id,
+          lock_at: new Date(lockInput.value).toISOString(),
+          goals_pot: Number(goalsPotInput.value || 0),
+          bracket_pot: Number(bracketPotInput.value || 0)
+        }, { onConflict: "pool_id" });
+
+      throwIfSupabaseError(error);
+      await loadPoolData();
+    }
+
+    if (knockoutMatchId) {
+      event.preventDefault();
+      const inputs = event.target.querySelectorAll("input");
+      const winnerSelect = event.target.querySelector("select");
+      const match = state.knockoutMatches.find((item) => item.id === knockoutMatchId);
+      setStatus("Saving");
+
+      const { error } = await db
+        .from("knockout_matches")
+        .update({
+          label: inputs[0].value.trim(),
+          team_a: inputs[1].value.trim(),
+          team_b: inputs[2].value.trim(),
+          kickoff: new Date(inputs[3].value).toISOString(),
+          actual_total_goals: inputs[4].value === "" ? null : Number(inputs[4].value),
+          winner: winnerSelect.value || null
+        })
+        .eq("id", knockoutMatchId)
+        .eq("pool_id", currentPool.id);
+
+      throwIfSupabaseError(error);
+
+      if (match && winnerSelect.value && ![inputs[1].value.trim(), inputs[2].value.trim()].includes(winnerSelect.value)) {
+        console.warn("Saved winner did not match the edited team names.");
+      }
+
+      await loadPoolData();
+    }
+
+    if (knockoutPredictionMatchId) {
+      event.preventDefault();
+      if (isKnockoutLocked()) return;
+
+      const [goalsInput] = event.target.querySelectorAll("input");
+      const winnerSelect = event.target.querySelector("select");
+      const playerId = elements.playerSelect.value;
+      setStatus("Saving");
+
+      const { error } = await db.from("knockout_predictions").upsert({
+        pool_id: currentPool.id,
+        player_id: playerId,
+        match_id: knockoutPredictionMatchId,
+        goals_prediction: goalsInput.value === "" ? null : Number(goalsInput.value),
+        winner_prediction: winnerSelect.value || null
+      }, { onConflict: "pool_id,player_id,match_id" });
+
+      throwIfSupabaseError(error);
+      await loadPoolData();
+    }
+
     if (scoreMatchId) {
       event.preventDefault();
       const [homeInput, awayInput] = event.target.querySelectorAll("input");

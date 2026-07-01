@@ -403,6 +403,21 @@ main {
   font-size: 1.05rem;
 }
 
+.leaderboard-section {
+  display: grid;
+  gap: 10px;
+}
+
+.leaderboard-section + .leaderboard-section {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.leaderboard-section h4 {
+  margin: 0;
+}
+
 .muted {
   color: var(--muted);
 }
@@ -492,7 +507,10 @@ main {
 .inline-form,
 .match-form,
 .score-form,
-.prediction-form {
+.prediction-form,
+.knockout-prediction-form,
+.knockout-settings-form,
+.knockout-match-form {
   display: grid;
   gap: 10px;
 }
@@ -557,6 +575,37 @@ select {
   align-items: center;
 }
 
+.knockout-prediction-form {
+  grid-template-columns: minmax(120px, 180px) minmax(180px, 1fr) auto;
+  align-items: end;
+}
+
+.knockout-settings-form {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
+}
+
+.knockout-match-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.knockout-match-form .prediction-meta {
+  grid-column: 1 / -1;
+}
+
+.knockout-match-form button {
+  grid-column: 1 / -1;
+}
+
+.knockout-prediction-form label,
+.knockout-settings-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
 .score-form input,
 .prediction-form input {
   text-align: center;
@@ -618,7 +667,10 @@ select {
   .nav-tabs,
   .match-form,
   .score-form,
-  .prediction-form {
+  .prediction-form,
+  .knockout-prediction-form,
+  .knockout-settings-form,
+  .knockout-match-form {
     grid-template-columns: 1fr;
   }
 
