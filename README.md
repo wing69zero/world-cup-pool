@@ -55,6 +55,13 @@ The knockout mode contains two sub-pools:
 
 All knockout predictions lock at the global lock time configured in Setup.
 
+Bracket winner dropdowns expand by stage:
+
+- R16: choose from 2 teams.
+- QF: choose from 4 possible teams in that branch.
+- SF: choose from 8 possible teams in that half.
+- Third-place and Final: choose from all 16 knockout teams.
+
 ## Vercel Deployment
 
 Add these environment variables in Vercel:

@@ -405,6 +405,7 @@ function renderKnockoutDashboard() {
     <article class="match-row">
       <div class="time">Goals Pool: exact total goals = 3 pts, off by 1 = 1 pt. Penalty shootout goals do not count.</div>
       <div class="time">Bracket Pool: R16 2 pts, QF 3 pts, SF 5 pts, third-place 3 pts, final 8 pts. Penalty winners count.</div>
+      <div class="time">Future-stage winner choices are based on each bracket branch: QF choices come from 4 possible teams, SF from 8, and Final/third-place from all 16.</div>
     </article>
   `;
 }
@@ -537,7 +538,13 @@ function renderAdminMatches() {
         </form>
         <button class="secondary-button" data-remove-match="${match.id}" type="button">Remove Match</button>
       </article>
-    `)
+      `)
+    .join("");
+}
+
+function winnerOptionsMarkup(options, selectedValue) {
+  return options
+    .map((team) => `<option value="${escapeHtml(team)}" ${selectedValue === team ? "selected" : ""}>${escapeHtml(team)}</option>`)
     .join("");
 }
 
@@ -553,10 +560,7 @@ function renderKnockoutPredictions() {
   elements.predictionBoard.innerHTML = state.knockoutMatches
     .map((match) => {
       const prediction = getKnockoutPrediction(selectedPlayerId, match.id);
-      const winnerOptions = [match.teamA, match.teamB]
-        .filter(Boolean)
-        .map((team) => `<option value="${escapeHtml(team)}" ${prediction?.winnerPrediction === team ? "selected" : ""}>${escapeHtml(team)}</option>`)
-        .join("");
+      const winnerOptions = getWinnerCandidates(match);
 
       return `
         <article class="prediction-row">
@@ -579,7 +583,7 @@ function renderKnockoutPredictions() {
               Winner
               <select ${locked ? "disabled" : ""}>
                 <option value="">Pick winner</option>
-                ${winnerOptions}
+                ${winnerOptionsMarkup(winnerOptions, prediction?.winnerPrediction)}
               </select>
             </label>
             <button type="submit" ${locked ? "disabled" : ""}>Save Picks</button>
@@ -616,6 +620,9 @@ function renderKnockoutAdmin() {
 }
 
 function knockoutAdminMatchMarkup(match) {
+  const winnerOptions = getWinnerCandidates(match);
+  const candidateText = winnerOptions.join(", ");
+
   return `
     <article class="match-row">
       <form class="knockout-match-form" data-ko-match="${match.id}">
@@ -623,6 +630,7 @@ function knockoutAdminMatchMarkup(match) {
           <div>
             <div class="teams">${escapeHtml(match.label)}</div>
             <div class="time">${escapeHtml(match.stage)} - slot ${match.slotNo}</div>
+            <div class="time">Winner choices: ${escapeHtml(candidateText)}</div>
           </div>
         </div>
         <input aria-label="Match label" value="${escapeHtml(match.label)}" required>
@@ -632,8 +640,7 @@ function knockoutAdminMatchMarkup(match) {
         <input aria-label="Actual total goals" min="0" type="number" value="${match.actualTotalGoals ?? ""}" placeholder="Actual total goals">
         <select aria-label="Actual winner">
           <option value="">Winner not set</option>
-          <option value="${escapeHtml(match.teamA)}" ${match.winner === match.teamA ? "selected" : ""}>${escapeHtml(match.teamA)}</option>
-          <option value="${escapeHtml(match.teamB)}" ${match.winner === match.teamB ? "selected" : ""}>${escapeHtml(match.teamB)}</option>
+          ${winnerOptionsMarkup(winnerOptions, match.winner)}
         </select>
         <button type="submit">Save Match</button>
       </form>
@@ -755,6 +762,52 @@ function knockoutStagePoints(stage) {
     "3P": 3,
     Final: 8
   }[stage] || 0;
+}
+
+function getWinnerCandidates(match) {
+  const slots = getCandidateR16Slots(match);
+  const teams = slots.flatMap((slotNo) => getR16Teams(slotNo));
+  const uniqueTeams = [...new Set(teams.filter(Boolean))];
+
+  if (uniqueTeams.length) {
+    return uniqueTeams;
+  }
+
+  return [match.teamA, match.teamB].filter(Boolean);
+}
+
+function getCandidateR16Slots(match) {
+  if (match.stage === "R16") {
+    return [match.slotNo];
+  }
+
+  if (match.stage === "QF") {
+    return {
+      9: [1, 2],
+      10: [3, 4],
+      11: [5, 6],
+      12: [7, 8]
+    }[match.slotNo] || [];
+  }
+
+  if (match.stage === "SF") {
+    return {
+      13: [1, 2, 3, 4],
+      14: [5, 6, 7, 8]
+    }[match.slotNo] || [];
+  }
+
+  if (match.stage === "3P" || match.stage === "Final") {
+    return [1, 2, 3, 4, 5, 6, 7, 8];
+  }
+
+  return [];
+}
+
+function getR16Teams(slotNo) {
+  const match = state.knockoutMatches.find((item) => item.slotNo === slotNo);
+  if (!match) return [];
+  return [match.teamA, match.teamB];
 }
 
 function formatDate(value) {
